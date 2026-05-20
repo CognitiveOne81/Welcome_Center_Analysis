@@ -1,0 +1,41 @@
+{
+  "tour_set": [
+    "Brooks College of Health Tour",
+    "Coggin College of Business Tour",
+    "College of Arts and Sciences Tour",
+    "College of Computing, Engineering, and Construction Tour",
+    "Silverfield College of Education and Human Services Tour"
+  ],
+  "rows_used_after_cleaning": 53,
+  "text_column": "Comments",
+  "clusters": [
+    {
+      "cluster": "rating_4",
+      "ratings_included": [
+        4
+      ],
+      "rows_in_bucket": 33,
+      "non_empty_comments": 24,
+      "top_phrases": [
+        "it was",
+        "of the",
+        "the tour"
+      ]
+    },
+    {
+      "cluster": "rating_0_1_2_3",
+      "ratings_included": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "rows_in_bucket": 20,
+      "non_empty_comments": 18,
+      "top_phrases": [
+        "the tour",
+        "of the"
+      ]
+    }
+  ]
+}
