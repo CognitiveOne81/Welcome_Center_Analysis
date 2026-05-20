@@ -11,15 +11,31 @@ DATE_COLUMN = "Date"
 RATING_COLUMN = "Rating"
 TEXT_COLUMN_CANDIDATES = ["Comments", "Feedback", "comment", "text"]
 
-PHASE_WINDOWS = [
-    ("2024-07-01", "2025-06-30", "phase_1_2024-07-01_to_2025-06-30"),
-    ("2025-07-01", "2026-05-19", "phase_2_2025-07-01_to_2026-05-19"),
-]
+TOUR_TYPE_COLUMN = "What type of tour did you take?"
+TARGET_TOUR_TYPE = "Large group Tour"
 RATING_GROUPS = [
     ([4], "rating_4"),
-    ([3], "rating_3"),
-    ([0, 1, 2], "rating_0_1_2"),
+    ([0, 1, 2, 3], "rating_0_1_2_3"),
 ]
+
+SHORT_POSITIVE_MARKERS = {
+    "good",
+    "great",
+    "excellent",
+    "awesome",
+    "amazing",
+    "nice",
+    "perfect",
+    "helpful",
+    "friendly",
+    "love",
+    "loved",
+    "wonderful",
+    "fantastic",
+    "outstanding",
+    "satisfied",
+    "happy",
+}
 
 
 def find_text_column(df: pd.DataFrame) -> str:
@@ -60,36 +76,68 @@ def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     return [phrases[i] for i in idx]
 
 
+def is_short_positive_comment(comment: str) -> bool:
+    normalized = " ".join(comment.strip().lower().split())
+    if not normalized:
+        return True
+
+    words = normalized.split()
+    if len(words) > 7:
+        return False
+
+    # Treat short comments with no sentence punctuation as "less than a sentence".
+    has_sentence_punctuation = any(p in normalized for p in ".!?")
+    if has_sentence_punctuation:
+        return False
+
+    if normalized in {"n/a", "na", "none"}:
+        return True
+
+    return any(marker in words for marker in SHORT_POSITIVE_MARKERS)
+
+
+def filter_comments_for_cluster(comments: pd.Series, rating_name: str) -> pd.Series:
+    cleaned = comments.fillna("").astype(str)
+    cleaned = cleaned[cleaned.str.strip() != ""]
+
+    if rating_name == "rating_4":
+        cleaned = cleaned[~cleaned.apply(is_short_positive_comment)]
+
+    return cleaned
+
+
 def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
     clusters: list[dict] = []
 
-    for start_str, end_str, phase_name in PHASE_WINDOWS:
-        start = pd.Timestamp(start_str)
-        end = pd.Timestamp(end_str) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    weekday_tour_mask = (
+        df[TOUR_TYPE_COLUMN]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+        == TARGET_TOUR_TYPE.casefold()
+    )
+    tour_df = df.loc[weekday_tour_mask]
 
-        date_mask = (df[DATE_COLUMN] >= start) & (df[DATE_COLUMN] <= end)
-        phase_df = df.loc[date_mask]
+    for ratings, rating_name in RATING_GROUPS:
+        bucket = tour_df[tour_df[RATING_COLUMN].isin(ratings)]
+        comments = filter_comments_for_cluster(bucket[text_col], rating_name)
+        cluster_count = 3 if rating_name == "rating_4" else 2
 
-        for ratings, rating_name in RATING_GROUPS:
-            bucket = phase_df[phase_df[RATING_COLUMN].isin(ratings)]
-            comments = bucket[text_col].fillna("").astype(str)
-            comments = comments[comments.str.strip() != ""]
-
-            clusters.append(
-                {
-                    "phase": phase_name,
-                    "date_range": {"start": start_str, "end": end_str},
-                    "cluster": rating_name,
-                    "ratings_included": ratings,
-                    "rows_in_bucket": int(len(bucket)),
-                    "non_empty_comments": int(len(comments)),
-                    "top_phrases": top_phrases_from_rows(comments, top_k=12),
-                }
-            )
+        clusters.append(
+            {
+                "tour_type": TARGET_TOUR_TYPE,
+                "cluster": rating_name,
+                "ratings_included": ratings,
+                "rows_in_bucket": int(len(bucket)),
+                "non_empty_comments": int(len(comments)),
+                "top_phrases": top_phrases_from_rows(comments, top_k=cluster_count),
+            }
+        )
 
     return {
         "model": "TF-IDF keyphrase extraction (2-5 gram phrases)",
-        "cluster_definition": "Date/rating buckets generated from configured phase and rating groups",
+        "cluster_definition": "Tour-type and rating buckets generated from configured target tour and rating groups",
         "clusters": clusters,
     }
 
@@ -104,6 +152,8 @@ def main() -> None:
         raise ValueError(f"Missing required column: {DATE_COLUMN}")
     if RATING_COLUMN not in df.columns:
         raise ValueError(f"Missing required column: {RATING_COLUMN}")
+    if TOUR_TYPE_COLUMN not in df.columns:
+        raise ValueError(f"Missing required column: {TOUR_TYPE_COLUMN}")
 
     text_col = find_text_column(df)
 
