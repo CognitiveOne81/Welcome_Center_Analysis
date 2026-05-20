@@ -1,40 +1,91 @@
 #!/usr/bin/env python3
-"""Extract common ideas/phrases from feedback with topic modeling + keyphrases."""
+"""Extract phrase clusters for specific date/rating buckets."""
 import json
 from pathlib import Path
 
 import pandas as pd
-from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 DATA_FILE = Path("7-1-2024-5-19-2026 General Feedback.csv")
-TEXT_COLUMN_CANDIDATES = ["Feedback", "Comments", "comment", "text"]
+DATE_COLUMN = "Date"
+RATING_COLUMN = "Rating"
+TEXT_COLUMN_CANDIDATES = ["Comments", "Feedback", "comment", "text"]
+
+PHASE_WINDOWS = [
+    ("2024-07-01", "2025-06-30", "phase_1_2024-07-01_to_2025-06-30"),
+    ("2025-07-01", "2026-05-19", "phase_2_2025-07-01_to_2026-05-19"),
+]
+RATING_GROUPS = [
+    ([4], "rating_4"),
+    ([3], "rating_3"),
+    ([0, 1, 2], "rating_0_1_2"),
+]
 
 
 def find_text_column(df: pd.DataFrame) -> str:
     for col in TEXT_COLUMN_CANDIDATES:
         if col in df.columns:
             return col
-    for col in df.columns:
-        if df[col].dtype == object:
-            return col
-    raise ValueError("Could not find a text column in dataset.")
+    raise ValueError(
+        f"Could not find a text column. Tried: {', '.join(TEXT_COLUMN_CANDIDATES)}"
+    )
 
 
-def top_phrases_from_rows(rows: pd.Series, top_k: int = 10) -> list[str]:
+def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
+    if len(rows) < 2:
+        return []
+
     vec = TfidfVectorizer(
         stop_words="english",
         lowercase=True,
         ngram_range=(2, 3),
-        min_df=2,
-        max_df=0.9,
-        max_features=3000,
+        min_df=1,
+        max_df=0.95,
+        max_features=4000,
     )
+
     X = vec.fit_transform(rows)
+    if X.shape[1] == 0:
+        return []
+
     scores = X.sum(axis=0).A1
     phrases = vec.get_feature_names_out()
     idx = scores.argsort()[-top_k:][::-1]
     return [phrases[i] for i in idx]
+
+
+def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
+    clusters: list[dict] = []
+
+    for start_str, end_str, phase_name in PHASE_WINDOWS:
+        start = pd.Timestamp(start_str)
+        end = pd.Timestamp(end_str) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+        date_mask = (df[DATE_COLUMN] >= start) & (df[DATE_COLUMN] <= end)
+        phase_df = df.loc[date_mask]
+
+        for ratings, rating_name in RATING_GROUPS:
+            bucket = phase_df[phase_df[RATING_COLUMN].isin(ratings)]
+            comments = bucket[text_col].fillna("").astype(str)
+            comments = comments[comments.str.strip() != ""]
+
+            clusters.append(
+                {
+                    "phase": phase_name,
+                    "date_range": {"start": start_str, "end": end_str},
+                    "cluster": rating_name,
+                    "ratings_included": ratings,
+                    "rows_in_bucket": int(len(bucket)),
+                    "non_empty_comments": int(len(comments)),
+                    "top_phrases": top_phrases_from_rows(comments, top_k=12),
+                }
+            )
+
+    return {
+        "model": "TF-IDF keyphrase extraction (bi/tri-grams)",
+        "cluster_definition": "6 total clusters: 2 date phases x 3 rating groups",
+        "clusters": clusters,
+    }
 
 
 def main() -> None:
@@ -42,57 +93,23 @@ def main() -> None:
         raise FileNotFoundError(f"Dataset not found: {DATA_FILE}")
 
     df = pd.read_csv(DATA_FILE)
+
+    if DATE_COLUMN not in df.columns:
+        raise ValueError(f"Missing required column: {DATE_COLUMN}")
+    if RATING_COLUMN not in df.columns:
+        raise ValueError(f"Missing required column: {RATING_COLUMN}")
+
     text_col = find_text_column(df)
-    texts = df[text_col].fillna("").astype(str)
-    texts = texts[texts.str.strip() != ""]
 
-    if len(texts) < 10:
-        raise ValueError("Need at least 10 non-empty text rows for topic extraction.")
+    df[DATE_COLUMN] = pd.to_datetime(df[DATE_COLUMN], errors="coerce")
+    df[RATING_COLUMN] = pd.to_numeric(df[RATING_COLUMN], errors="coerce")
 
-    vectorizer = TfidfVectorizer(
-        stop_words="english",
-        lowercase=True,
-        ngram_range=(1, 2),
-        min_df=2,
-        max_df=0.9,
-        max_features=8000,
-    )
-    X = vectorizer.fit_transform(texts)
+    df = df.dropna(subset=[DATE_COLUMN, RATING_COLUMN])
+    df[RATING_COLUMN] = df[RATING_COLUMN].astype(int)
 
-    n_topics = min(8, max(3, len(texts) // 40))
-    model = NMF(n_components=n_topics, random_state=42, init="nndsvda", max_iter=500)
-    W = model.fit_transform(X)
-    H = model.components_
-
-    terms = vectorizer.get_feature_names_out()
-    topic_assignments = W.argmax(axis=1)
-
-    report = {
-        "rows_used": int(len(texts)),
-        "text_column": text_col,
-        "model": "NMF(topic modeling) + TF-IDF keyphrase extraction",
-        "topics": [],
-        "global_top_phrases": top_phrases_from_rows(texts, top_k=15),
-    }
-
-    for topic_id in range(n_topics):
-        term_idx = H[topic_id].argsort()[-10:][::-1]
-        top_terms = [terms[i] for i in term_idx]
-
-        member_mask = topic_assignments == topic_id
-        member_rows = texts[member_mask]
-        size = int(member_mask.sum())
-
-        phrases = top_phrases_from_rows(member_rows, top_k=8) if size >= 5 else []
-
-        report["topics"].append(
-            {
-                "topic": int(topic_id),
-                "size": size,
-                "top_terms": top_terms,
-                "top_phrases": phrases,
-            }
-        )
+    report = phase_cluster_report(df, text_col)
+    report["rows_used_after_cleaning"] = int(len(df))
+    report["text_column"] = text_col
 
     print(json.dumps(report, indent=2))
 
