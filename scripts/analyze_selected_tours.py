@@ -20,10 +20,8 @@ TARGET_TOURS = {
     "Silverfield College of Education and Human Services Tour",
     "Coggin College of Business Tour",
 }
-RATING_GROUPS = [
-    ([4], "rating_4"),
-    ([0, 1, 2, 3], "rating_0_1_2_3"),
-]
+POSITIVE_RATING = 4
+SHORT_POSITIVE_WORD_LIMIT = 5
 
 
 def find_text_column(columns: list[str]) -> str:
@@ -66,6 +64,11 @@ def extract_top_phrases(comments: list[str], top_k: int = 12) -> list[str]:
     return [phrase for phrase, _ in counts.most_common(top_k)]
 
 
+def is_college_tour(tour_type: str) -> bool:
+    tour_label = (tour_type or "").strip()
+    return tour_label in TARGET_TOURS or "college" in tour_label.lower()
+
+
 def main() -> None:
     with DATA_FILE.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -73,7 +76,8 @@ def main() -> None:
 
         filtered = []
         for row in reader:
-            if (row.get(TOUR_TYPE_COLUMN, "") or "").strip() not in TARGET_TOURS:
+            tour_type = row.get(TOUR_TYPE_COLUMN, "") or ""
+            if not is_college_tour(tour_type):
                 continue
             d = parse_date(row.get(DATE_COLUMN, ""))
             if d is None:
@@ -85,28 +89,33 @@ def main() -> None:
             text = clean_text(row.get(text_col, ""))
             filtered.append((rating, text))
 
-    clusters = []
-    for ratings, name in RATING_GROUPS:
-        bucket = [text for rt, text in filtered if rt in ratings]
-        comments = [text for text in bucket if text]
-        top_k = 3 if name == "rating_4" else 2
-        clusters.append(
-            {
-                "cluster": name,
-                "ratings_included": ratings,
-                "rows_in_bucket": len(bucket),
-                "non_empty_comments": len(comments),
-                "top_phrases": extract_top_phrases(comments, top_k=top_k),
-            }
-        )
+    positive_comments = [text for rt, text in filtered if rt == POSITIVE_RATING and text]
+    short_positive_comments = [
+        text for text in positive_comments if len(tokenize(text)) <= SHORT_POSITIVE_WORD_LIMIT
+    ]
+    notable_long_positive_comments = [
+        text for text in positive_comments if len(tokenize(text)) > SHORT_POSITIVE_WORD_LIMIT
+    ]
 
     print(
         json.dumps(
             {
                 "tour_set": sorted(TARGET_TOURS),
+                "college_filter": "exact target tours OR any tour type containing 'college'",
                 "rows_used_after_cleaning": len(filtered),
                 "text_column": text_col,
-                "clusters": clusters,
+                "positive_rating": POSITIVE_RATING,
+                "short_positive_word_limit": SHORT_POSITIVE_WORD_LIMIT,
+                "positive_non_empty_comments": len(positive_comments),
+                "short_positive_comments": {
+                    "count": len(short_positive_comments),
+                    "top_phrases": extract_top_phrases(short_positive_comments, top_k=3),
+                },
+                "notable_long_positive_comments": {
+                    "count": len(notable_long_positive_comments),
+                    "examples": notable_long_positive_comments[:10],
+                    "top_phrases": extract_top_phrases(notable_long_positive_comments, top_k=5),
+                },
             },
             indent=2,
         )
