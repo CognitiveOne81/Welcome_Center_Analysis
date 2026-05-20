@@ -1,0 +1,599 @@
+{
+  "short_comment_word_limit": 4,
+  "rows_with_non_empty_comments": 542,
+  "text_column": "Comments",
+  "clusters": [
+    {
+      "phase": "phase_1_2024-07-01_to_2025-06-30",
+      "cluster": "rating_4",
+      "ratings_included": [
+        4
+      ],
+      "non_empty_comments": 214,
+      "short_comment_count": 30,
+      "short_comment_share": 0.14,
+      "top_phrases": [
+        "the tour",
+        "tour guide",
+        "it was",
+        "was very",
+        "of the",
+        "great tour",
+        "guide was",
+        "in the",
+        "would be",
+        "and the",
+        "the campus",
+        "for the"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "the tour",
+          "comment_hits": 37,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour guide",
+          "comment_hits": 33,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "it was",
+          "comment_hits": 23,
+          "short_comment_hits": 3,
+          "short_hit_share": 0.13
+        },
+        {
+          "phrase": "was very",
+          "comment_hits": 21,
+          "short_comment_hits": 1,
+          "short_hit_share": 0.048
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 18,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "great tour",
+          "comment_hits": 13,
+          "short_comment_hits": 1,
+          "short_hit_share": 0.077
+        },
+        {
+          "phrase": "guide was",
+          "comment_hits": 13,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "in the",
+          "comment_hits": 14,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "would be",
+          "comment_hits": 12,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "and the",
+          "comment_hits": 13,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the campus",
+          "comment_hits": 11,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "for the",
+          "comment_hits": 12,
+          "short_comment_hits": 1,
+          "short_hit_share": 0.083
+        }
+      ]
+    },
+    {
+      "phase": "phase_1_2024-07-01_to_2025-06-30",
+      "cluster": "rating_3",
+      "ratings_included": [
+        3
+      ],
+      "non_empty_comments": 41,
+      "short_comment_count": 2,
+      "short_comment_share": 0.049,
+      "top_phrases": [
+        "the tour",
+        "to see",
+        "of the",
+        "it was",
+        "liked to",
+        "tour guide",
+        "would have",
+        "see the",
+        "i was",
+        "guide was",
+        "the buildings",
+        "to see the"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "the tour",
+          "comment_hits": 9,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to see",
+          "comment_hits": 7,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 7,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "it was",
+          "comment_hits": 7,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "liked to",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour guide",
+          "comment_hits": 7,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "would have",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "see the",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "i was",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "guide was",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the buildings",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to see the",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        }
+      ]
+    },
+    {
+      "phase": "phase_1_2024-07-01_to_2025-06-30",
+      "cluster": "rating_0_1_2",
+      "ratings_included": [
+        0,
+        1,
+        2
+      ],
+      "non_empty_comments": 27,
+      "short_comment_count": 2,
+      "short_comment_share": 0.074,
+      "top_phrases": [
+        "tour guide",
+        "the tour",
+        "of the",
+        "it was",
+        "guide was",
+        "tour guide was",
+        "tour was",
+        "the tour was",
+        "the tour guide",
+        "was not",
+        "our tour",
+        "was very"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "tour guide",
+          "comment_hits": 10,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the tour",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "it was",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "guide was",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour guide was",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour was",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the tour was",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the tour guide",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "was not",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "our tour",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "was very",
+          "comment_hits": 4,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        }
+      ]
+    },
+    {
+      "phase": "phase_2_2025-07-01_to_2026-05-19",
+      "cluster": "rating_4",
+      "ratings_included": [
+        4
+      ],
+      "non_empty_comments": 174,
+      "short_comment_count": 29,
+      "short_comment_share": 0.167,
+      "top_phrases": [
+        "it was",
+        "tour guide",
+        "the tour",
+        "was very",
+        "the campus",
+        "was great",
+        "of the",
+        "about the",
+        "would have",
+        "to see",
+        "she was",
+        "in the"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "it was",
+          "comment_hits": 25,
+          "short_comment_hits": 4,
+          "short_hit_share": 0.16
+        },
+        {
+          "phrase": "tour guide",
+          "comment_hits": 24,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the tour",
+          "comment_hits": 21,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "was very",
+          "comment_hits": 19,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the campus",
+          "comment_hits": 16,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "was great",
+          "comment_hits": 13,
+          "short_comment_hits": 2,
+          "short_hit_share": 0.154
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 14,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "about the",
+          "comment_hits": 9,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "would have",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to see",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "she was",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "in the",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        }
+      ]
+    },
+    {
+      "phase": "phase_2_2025-07-01_to_2026-05-19",
+      "cluster": "rating_3",
+      "ratings_included": [
+        3
+      ],
+      "non_empty_comments": 51,
+      "short_comment_count": 2,
+      "short_comment_share": 0.039,
+      "top_phrases": [
+        "the tour",
+        "of the",
+        "was a",
+        "would have",
+        "to see",
+        "in the",
+        "it was",
+        "the buildings",
+        "i would",
+        "tour guide",
+        "would be",
+        "about the"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "the tour",
+          "comment_hits": 15,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 14,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "was a",
+          "comment_hits": 9,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "would have",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to see",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "in the",
+          "comment_hits": 8,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "it was",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the buildings",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "i would",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour guide",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "would be",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "about the",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        }
+      ]
+    },
+    {
+      "phase": "phase_2_2025-07-01_to_2026-05-19",
+      "cluster": "rating_0_1_2",
+      "ratings_included": [
+        0,
+        1,
+        2
+      ],
+      "non_empty_comments": 35,
+      "short_comment_count": 1,
+      "short_comment_share": 0.029,
+      "top_phrases": [
+        "the tour",
+        "tour guide",
+        "of the",
+        "about the",
+        "to be",
+        "the tour and",
+        "tour and",
+        "in the",
+        "and the",
+        "to go",
+        "at the",
+        "it was"
+      ],
+      "top_phrase_short_comment_bias": [
+        {
+          "phrase": "the tour",
+          "comment_hits": 13,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour guide",
+          "comment_hits": 9,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "of the",
+          "comment_hits": 7,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "about the",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to be",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "the tour and",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "tour and",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "in the",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "and the",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "to go",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "at the",
+          "comment_hits": 6,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        },
+        {
+          "phrase": "it was",
+          "comment_hits": 5,
+          "short_comment_hits": 0,
+          "short_hit_share": 0.0
+        }
+      ]
+    }
+  ]
+}
