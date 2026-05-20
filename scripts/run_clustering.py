@@ -12,7 +12,7 @@ RATING_COLUMN = "Rating"
 TEXT_COLUMN_CANDIDATES = ["Comments", "Feedback", "comment", "text"]
 
 TOUR_TYPE_COLUMN = "What type of tour did you take?"
-TARGET_TOUR_TYPE = "Weekday campus Tour"
+TARGET_TOUR_TYPE = "Large group Tour"
 RATING_GROUPS = [
     ([4], "rating_4"),
     ([0, 1, 2, 3], "rating_0_1_2_3"),
