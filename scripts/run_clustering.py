@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Run clustering on the feedback CSV and print a short report."""
+"""Extract common ideas/phrases from feedback with topic modeling + keyphrases."""
 import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
 
 DATA_FILE = Path("7-1-2024-5-19-2026 General Feedback.csv")
 TEXT_COLUMN_CANDIDATES = ["Feedback", "Comments", "comment", "text"]
@@ -21,40 +21,78 @@ def find_text_column(df: pd.DataFrame) -> str:
     raise ValueError("Could not find a text column in dataset.")
 
 
+def top_phrases_from_rows(rows: pd.Series, top_k: int = 10) -> list[str]:
+    vec = TfidfVectorizer(
+        stop_words="english",
+        lowercase=True,
+        ngram_range=(2, 3),
+        min_df=2,
+        max_df=0.9,
+        max_features=3000,
+    )
+    X = vec.fit_transform(rows)
+    scores = X.sum(axis=0).A1
+    phrases = vec.get_feature_names_out()
+    idx = scores.argsort()[-top_k:][::-1]
+    return [phrases[i] for i in idx]
+
+
 def main() -> None:
     if not DATA_FILE.exists():
         raise FileNotFoundError(f"Dataset not found: {DATA_FILE}")
 
     df = pd.read_csv(DATA_FILE)
     text_col = find_text_column(df)
-
     texts = df[text_col].fillna("").astype(str)
     texts = texts[texts.str.strip() != ""]
 
-    if len(texts) < 5:
-        raise ValueError("Need at least 5 non-empty text rows for clustering.")
+    if len(texts) < 10:
+        raise ValueError("Need at least 10 non-empty text rows for topic extraction.")
 
-    vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        lowercase=True,
+        ngram_range=(1, 2),
+        min_df=2,
+        max_df=0.9,
+        max_features=8000,
+    )
     X = vectorizer.fit_transform(texts)
 
-    n_clusters = min(5, max(2, len(texts) // 25))
-    model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = model.fit_predict(X)
+    n_topics = min(8, max(3, len(texts) // 40))
+    model = NMF(n_components=n_topics, random_state=42, init="nndsvda", max_iter=500)
+    W = model.fit_transform(X)
+    H = model.components_
 
     terms = vectorizer.get_feature_names_out()
-    centers = model.cluster_centers_
+    topic_assignments = W.argmax(axis=1)
 
     report = {
         "rows_used": int(len(texts)),
         "text_column": text_col,
-        "clusters": [],
+        "model": "NMF(topic modeling) + TF-IDF keyphrase extraction",
+        "topics": [],
+        "global_top_phrases": top_phrases_from_rows(texts, top_k=15),
     }
 
-    for i in range(n_clusters):
-        top_idx = centers[i].argsort()[-8:][::-1]
-        top_terms = [terms[j] for j in top_idx]
-        size = int((labels == i).sum())
-        report["clusters"].append({"cluster": i, "size": size, "top_terms": top_terms})
+    for topic_id in range(n_topics):
+        term_idx = H[topic_id].argsort()[-10:][::-1]
+        top_terms = [terms[i] for i in term_idx]
+
+        member_mask = topic_assignments == topic_id
+        member_rows = texts[member_mask]
+        size = int(member_mask.sum())
+
+        phrases = top_phrases_from_rows(member_rows, top_k=8) if size >= 5 else []
+
+        report["topics"].append(
+            {
+                "topic": int(topic_id),
+                "size": size,
+                "top_terms": top_terms,
+                "top_phrases": phrases,
+            }
+        )
 
     print(json.dumps(report, indent=2))
 
