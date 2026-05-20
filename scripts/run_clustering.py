@@ -30,6 +30,9 @@ def find_text_column(df: pd.DataFrame) -> str:
         f"Could not find a text column. Tried: {', '.join(TEXT_COLUMN_CANDIDATES)}"
     )
 
+def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
+    if len(rows) < 2:
+        return []
 
 def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     if len(rows) < 2:
@@ -38,10 +41,10 @@ def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     vec = TfidfVectorizer(
         stop_words="english",
         lowercase=True,
-        ngram_range=(2, 3),
+        ngram_range=(2, 5),
         min_df=1,
         max_df=0.95,
-        max_features=4000,
+        max_features=8000,
     )
 
     X = vec.fit_transform(rows)
@@ -50,7 +53,14 @@ def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
 
     scores = X.sum(axis=0).A1
     phrases = vec.get_feature_names_out()
-    idx = scores.argsort()[-top_k:][::-1]
+
+    # Mildly favor longer phrases while preserving TF-IDF signal.
+    weighted_scores = []
+    for phrase, score in zip(phrases, scores):
+        phrase_len = len(phrase.split())
+        weighted_scores.append(score * (1 + 0.1 * (phrase_len - 2)))
+
+    idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:top_k]
     return [phrases[i] for i in idx]
 
 
@@ -82,7 +92,7 @@ def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
             )
 
     return {
-        "model": "TF-IDF keyphrase extraction (bi/tri-grams)",
+        "model": "TF-IDF keyphrase extraction (2-5 gram phrases)",
         "cluster_definition": "6 total clusters: 2 date phases x 3 rating groups",
         "clusters": clusters,
     }
