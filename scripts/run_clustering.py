@@ -34,10 +34,6 @@ def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     if len(rows) < 2:
         return []
 
-def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
-    if len(rows) < 2:
-        return []
-
     vec = TfidfVectorizer(
         stop_words="english",
         lowercase=True,
@@ -91,9 +87,26 @@ def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
                 }
             )
 
+    for ratings, rating_name in RATING_GROUPS:
+        bucket = df[df[RATING_COLUMN].isin(ratings)]
+        comments = bucket[text_col].fillna("").astype(str)
+        comments = comments[comments.str.strip() != ""]
+
+        clusters.append(
+            {
+                "phase": "all_time",
+                "date_range": "all_dates",
+                "cluster": f"{rating_name}_all_time",
+                "ratings_included": ratings,
+                "rows_in_bucket": int(len(bucket)),
+                "non_empty_comments": int(len(comments)),
+                "top_phrases": top_phrases_from_rows(comments, top_k=12),
+            }
+        )
+
     return {
         "model": "TF-IDF keyphrase extraction (2-5 gram phrases)",
-        "cluster_definition": "6 total clusters: 2 date phases x 3 rating groups",
+        "cluster_definition": "9 total clusters: 2 date phases x 3 rating groups + 3 all-time rating groups",
         "clusters": clusters,
     }
 
