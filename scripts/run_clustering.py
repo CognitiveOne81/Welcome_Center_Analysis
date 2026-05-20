@@ -15,8 +15,7 @@ TOUR_TYPE_COLUMN = "What type of tour did you take?"
 TARGET_TOUR_TYPE = "Weekday campus Tour"
 RATING_GROUPS = [
     ([4], "rating_4"),
-    ([3], "rating_3"),
-    ([0, 1, 2], "rating_0_1_2"),
+    ([0, 1, 2, 3], "rating_0_1_2_3"),
 ]
 
 SHORT_POSITIVE_MARKERS = {
