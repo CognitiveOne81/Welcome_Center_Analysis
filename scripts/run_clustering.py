@@ -30,6 +30,9 @@ def find_text_column(df: pd.DataFrame) -> str:
         f"Could not find a text column. Tried: {', '.join(TEXT_COLUMN_CANDIDATES)}"
     )
 
+def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
+    if len(rows) < 2:
+        return []
 
 def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     if len(rows) < 2:
