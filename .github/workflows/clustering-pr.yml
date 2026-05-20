@@ -1,0 +1,56 @@
+name: Run clustering on pull requests
+
+on:
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  clustering:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run clustering
+        run: python scripts/run_clustering.py > clustering_report.json
+
+      - name: Upload clustering report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clustering-report
+          path: clustering_report.json
+
+      - name: Comment report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('clustering_report.json', 'utf8');
+            const body = [
+              '## 🤖 Clustering report',
+              'Workflow ran successfully for this PR.',
+              '',
+              '```json',
+              report,
+              '```'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });
