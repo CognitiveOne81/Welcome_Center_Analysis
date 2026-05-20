@@ -21,6 +21,25 @@ RATING_GROUPS = [
     ([0, 1, 2], "rating_0_1_2"),
 ]
 
+SHORT_POSITIVE_MARKERS = {
+    "good",
+    "great",
+    "excellent",
+    "awesome",
+    "amazing",
+    "nice",
+    "perfect",
+    "helpful",
+    "friendly",
+    "love",
+    "loved",
+    "wonderful",
+    "fantastic",
+    "outstanding",
+    "satisfied",
+    "happy",
+}
+
 
 def find_text_column(df: pd.DataFrame) -> str:
     for col in TEXT_COLUMN_CANDIDATES:
@@ -60,6 +79,36 @@ def top_phrases_from_rows(rows: pd.Series, top_k: int = 12) -> list[str]:
     return [phrases[i] for i in idx]
 
 
+def is_short_positive_comment(comment: str) -> bool:
+    normalized = " ".join(comment.strip().lower().split())
+    if not normalized:
+        return True
+
+    words = normalized.split()
+    if len(words) > 7:
+        return False
+
+    # Treat short comments with no sentence punctuation as "less than a sentence".
+    has_sentence_punctuation = any(p in normalized for p in ".!?")
+    if has_sentence_punctuation:
+        return False
+
+    if normalized in {"n/a", "na", "none"}:
+        return True
+
+    return any(marker in words for marker in SHORT_POSITIVE_MARKERS)
+
+
+def filter_comments_for_cluster(comments: pd.Series, rating_name: str) -> pd.Series:
+    cleaned = comments.fillna("").astype(str)
+    cleaned = cleaned[cleaned.str.strip() != ""]
+
+    if rating_name == "rating_4":
+        cleaned = cleaned[~cleaned.apply(is_short_positive_comment)]
+
+    return cleaned
+
+
 def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
     clusters: list[dict] = []
 
@@ -72,8 +121,7 @@ def phase_cluster_report(df: pd.DataFrame, text_col: str) -> dict:
 
         for ratings, rating_name in RATING_GROUPS:
             bucket = phase_df[phase_df[RATING_COLUMN].isin(ratings)]
-            comments = bucket[text_col].fillna("").astype(str)
-            comments = comments[comments.str.strip() != ""]
+            comments = filter_comments_for_cluster(bucket[text_col], rating_name)
 
             clusters.append(
                 {
