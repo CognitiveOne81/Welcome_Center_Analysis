@@ -1,31 +1,31 @@
-# General Tour Analysis
+# GitHub Code Display + Email Sender
 
-## Instant comment-theme analysis on every PR
+This repository has been reset to a single-purpose utility.
 
-This repo is configured with GitHub Actions to run topic/phrase extraction automatically on each pull request.
+## What it does
 
-### Recommended model for your goal (common phrases + ideas)
+The script in `scripts/github_email_sender.py` contains one function:
 
-Use **NMF topic modeling on TF-IDF vectors with n-grams**, then extract top bi/tri-grams per topic.
+- `display_github_code_and_send_email(...)`
 
-Why this is a good fit:
-- Works well on short feedback comments.
-- Produces interpretable topic keywords.
-- Captures repeated phrases (e.g., "tour guide", "wait time") via n-grams.
-- Runs fast and reliably in CI.
+That function:
+1. Reads a local code file.
+2. Prints the code to stdout (for GitHub Actions logs / terminal display).
+3. Emails the same code to your recipient address via SMTP.
 
-### What happens when you open/update a PR
+## Usage
 
-1. GitHub Action installs Python dependencies.
-2. It runs `scripts/run_clustering.py` on `7-1-2024-5-19-2026 General Feedback.csv`.
-3. It uploads `clustering_report.json` as a workflow artifact.
-4. It posts the JSON report as a comment directly on the pull request.
+```bash
+python scripts/github_email_sender.py \
+  --file README.md \
+  --to you@example.com \
+  --from sender@example.com \
+  --smtp-server smtp.example.com \
+  --smtp-port 587 \
+  --smtp-username your_user \
+  --smtp-password your_password
+```
 
-### How to use it
-
-1. Push your branch to GitHub.
-2. Open a pull request.
-3. Go to the **Actions** tab and open the latest **Run clustering on pull requests** run.
-4. Read the PR comment or download the artifact.
-
-If your data format/column names change, update `scripts/run_clustering.py`.
+Optional:
+- `--subject "Custom subject"`
+- `--use-tls` (recommended for port 587)
