@@ -1,0 +1,71 @@
+name: Model Preview + Email on Merge
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  run-model-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run clustering model (pre-merge preview)
+        run: |
+          python scripts/housing_feedback_clustering.py --clusters 3 | tee model_output.txt
+
+      - name: Upload model output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-output-preview
+          path: model_output.txt
+
+  email-model-on-merge:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run clustering model (merged branch)
+        run: |
+          python scripts/housing_feedback_clustering.py --clusters 3 | tee model_output.txt
+
+      - name: Email model output
+        env:
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          python scripts/github_email_sender.py \
+            --file model_output.txt \
+            --to "$RECIPIENT_EMAIL" \
+            --from "$SENDER_EMAIL" \
+            --smtp-server "$SMTP_SERVER" \
+            --smtp-port "$SMTP_PORT" \
+            --smtp-username "$SMTP_USERNAME" \
+            --smtp-password "$SMTP_PASSWORD" \
+            --subject "Merged model output from ${{ github.repository }}"
