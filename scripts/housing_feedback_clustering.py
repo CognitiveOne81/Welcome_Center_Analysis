@@ -58,6 +58,28 @@ def load_comments_by_rating(
     return high_rating_comments, low_rating_comments
 
 
+def load_comments(
+    csv_path: Path,
+    comments_column: str = "Comments",
+) -> list[str]:
+    """Load all non-empty comments from the dataset."""
+    comments: list[str] = []
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        fieldnames = reader.fieldnames or []
+        if comments_column not in fieldnames:
+            raise ValueError(
+                f"Column '{comments_column}' not found. Available columns: {fieldnames}"
+            )
+
+        for row in reader:
+            comment = (row.get(comments_column) or "").strip()
+            if comment:
+                comments.append(comment)
+
+    return comments
+
+
 def cluster_comments(comments: list[str], num_clusters: int, random_state: int = 42) -> tuple[list[int], KMeans, TfidfVectorizer]:
     """Cluster comments and return labels + fitted model/vectorizer."""
     vectorizer = TfidfVectorizer(stop_words="english", min_df=1)
@@ -143,6 +165,15 @@ def parse_args() -> argparse.Namespace:
         default=5,
         help="Top terms to display per cluster (default: 5)",
     )
+    parser.add_argument(
+        "--clusters",
+        type=int,
+        default=None,
+        help=(
+            "If provided, cluster all comments together with this number of clusters "
+            "(for example, --clusters 6)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -157,6 +188,27 @@ def validate_cluster_count(cluster_count: int, comments_count: int, label: str) 
 
 def main() -> None:
     args = parse_args()
+
+    if args.clusters is not None:
+        all_comments = load_comments(
+            args.dataset,
+            comments_column=args.comments_column,
+        )
+        if not all_comments:
+            raise ValueError("No non-empty comments found in dataset.")
+
+        validate_cluster_count(args.clusters, len(all_comments), "--clusters")
+        print(f"Loaded total comments: {len(all_comments)}")
+        labels, model, vectorizer = cluster_comments(all_comments, args.clusters)
+        print_cluster_summary(
+            f"Cluster Summary: All Comments ({args.clusters} clusters)",
+            all_comments,
+            labels,
+            vectorizer,
+            model,
+            args.top_terms,
+        )
+        return
 
     high_comments, low_comments = load_comments_by_rating(
         args.dataset,

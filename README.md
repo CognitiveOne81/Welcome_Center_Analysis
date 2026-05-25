@@ -76,6 +76,12 @@ Run clustering:
 python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3
 ```
 
+Run a single 6-cluster model across all comments:
+
+```bash
+python scripts/housing_feedback_clustering.py --clusters 6
+```
+
 Optional arguments:
 - `--dataset <path>`: custom CSV path.
 - `--comments-column <name>`: text column to cluster (default `Comments`).
@@ -84,3 +90,4 @@ Optional arguments:
 - `--high-rating-clusters <n>`: clusters for ratings `>= threshold` (default `3`).
 - `--low-rating-clusters <n>`: clusters for ratings `< threshold` (default `3`).
 - `--top-terms <n>`: number of representative terms per cluster.
+- `--clusters <n>`: cluster all comments together with `n` clusters (skips rating split).
