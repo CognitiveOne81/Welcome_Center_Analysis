@@ -7,8 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  run-model-preview:
-    if: github.event_name == 'pull_request'
+  run-model:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,34 +21,25 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run clustering model (pre-merge preview)
+      - name: Run clustering model
         run: |
           python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3 | tee model_output.txt
 
       - name: Upload model output artifact
         uses: actions/upload-artifact@v4
         with:
-          name: model-output-preview
+          name: model-output-${{ github.run_id }}
           path: model_output.txt
 
   email-model-on-merge:
     if: github.event_name == 'push'
+    needs: run-model
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Download model output artifact
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run clustering model (merged branch)
-        run: |
-          python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3 | tee model_output.txt
+          name: model-output-${{ github.run_id }}
 
       - name: Email model output
         env:
@@ -68,4 +58,5 @@ jobs:
             --smtp-port "$SMTP_PORT" \
             --smtp-username "$SMTP_USERNAME" \
             --smtp-password "$SMTP_PASSWORD" \
-            --subject "Merged model output from ${{ github.repository }}"
+            --subject "Merged model output from ${{ github.repository }}" \
+            --use-tls
