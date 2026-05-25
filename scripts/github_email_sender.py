@@ -54,7 +54,19 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--smtp-username", required=True, help="SMTP username")
     parser.add_argument("--smtp-password", required=True, help="SMTP password")
     parser.add_argument("--subject", default="Code from GitHub", help="Email subject")
-    parser.add_argument("--use-tls", action="store_true", help="Enable STARTTLS")
+    parser.add_argument(
+        "--use-tls",
+        dest="use_tls",
+        action="store_true",
+        default=True,
+        help="Enable STARTTLS (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-tls",
+        dest="use_tls",
+        action="store_false",
+        help="Disable STARTTLS",
+    )
     return parser.parse_args()
 
 
