@@ -24,7 +24,7 @@ jobs:
 
       - name: Run clustering model (pre-merge preview)
         run: |
-          python scripts/housing_feedback_clustering.py --clusters 3 | tee model_output.txt
+          python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3 | tee model_output.txt
 
       - name: Upload model output artifact
         uses: actions/upload-artifact@v4
@@ -49,7 +49,7 @@ jobs:
 
       - name: Run clustering model (merged branch)
         run: |
-          python scripts/housing_feedback_clustering.py --clusters 3 | tee model_output.txt
+          python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3 | tee model_output.txt
 
       - name: Email model output
         env:

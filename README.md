@@ -73,10 +73,14 @@ pip install -r requirements.txt
 Run clustering:
 
 ```bash
-python scripts/housing_feedback_clustering.py --clusters 3
+python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3
 ```
 
 Optional arguments:
 - `--dataset <path>`: custom CSV path.
 - `--comments-column <name>`: text column to cluster (default `Comments`).
+- `--rating-column <name>`: rating column used to split cohorts (default `Rating`).
+- `--high-rating-threshold <num>`: split threshold (default `4.0`).
+- `--high-rating-clusters <n>`: clusters for ratings `>= threshold` (default `3`).
+- `--low-rating-clusters <n>`: clusters for ratings `< threshold` (default `3`).
 - `--top-terms <n>`: number of representative terms per cluster.
