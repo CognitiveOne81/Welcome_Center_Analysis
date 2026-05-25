@@ -2,6 +2,34 @@
 
 This repository includes utility scripts for feedback analysis and notifications.
 
+## Automated GitHub feature (pre-merge run + email on merge)
+
+A GitHub Actions workflow is included at:
+
+- `.github/workflows/model-preview-and-email.yml`
+
+It does two things:
+
+1. **Before merge (Pull Request to `main`)**
+   - Installs dependencies.
+   - Runs the clustering model in GitHub Actions.
+   - Uploads the output as an artifact (`model-output-preview`) so you can review results before clicking merge.
+
+2. **After merge (Push to `main`)**
+   - Re-runs the clustering model on the merged code.
+   - Emails the run output (`model_output.txt`) using SMTP credentials stored as GitHub repository secrets.
+
+### Required GitHub secrets
+
+Set these in **Settings → Secrets and variables → Actions**:
+
+- `RECIPIENT_EMAIL`
+- `SENDER_EMAIL`
+- `SMTP_SERVER`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+
 ## Scripts
 
 ### 1) Display GitHub code and send email
