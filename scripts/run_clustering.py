@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Extract common ideas/phrases from housing feedback with topic modeling + keyphrases."""
+"""Extract rating-segmented feedback themes with phrase-first cluster headings."""
 import json
 from pathlib import Path
 
 import pandas as pd
-from sklearn.decomposition import NMF
+from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 DATA_FILE = Path("7-1-2024 -5-19-2026 Housing Feedback.csv")
 TEXT_COLUMN_CANDIDATES = ["Comments", "Feedback", "comment", "text"]
+RATING_COLUMN_CANDIDATES = ["Rating", "rating", "Score", "score"]
 
 
 def find_text_column(df: pd.DataFrame) -> str:
@@ -21,44 +22,68 @@ def find_text_column(df: pd.DataFrame) -> str:
     raise ValueError("Could not find a text column in dataset.")
 
 
-def top_phrases_from_rows(rows: pd.Series, top_k: int = 10) -> list[str]:
-    cleaned_rows = rows.fillna("").astype(str)
-    cleaned_rows = cleaned_rows[cleaned_rows.str.strip() != ""]
+def find_rating_column(df: pd.DataFrame) -> str:
+    for col in RATING_COLUMN_CANDIDATES:
+        if col in df.columns:
+            return col
+    raise ValueError(f"Could not find a rating column. Tried: {RATING_COLUMN_CANDIDATES}")
 
-    if len(cleaned_rows) < 2:
-        return []
 
-    # First pass: stricter settings for cleaner, repeated phrases.
-    # Fallback pass: relax document frequency thresholds so tiny/sparse clusters do not fail.
-    vectorizer_configs = [
-        {"min_df": 2, "max_df": 0.9},
-        {"min_df": 1, "max_df": 1.0},
-    ]
+def choose_topic_name(top_terms: list[str]) -> str:
+    for term in top_terms:
+        if " " in term:
+            return term
+    return top_terms[0] if top_terms else "n/a"
 
-    for config in vectorizer_configs:
-        vec = TfidfVectorizer(
-            stop_words="english",
-            lowercase=True,
-            ngram_range=(2, 3),
-            min_df=config["min_df"],
-            max_df=config["max_df"],
-            max_features=3000,
+
+def is_extremely_positive_short_comment(comment: str, max_words: int = 6) -> bool:
+    positive_markers = {
+        "great", "excellent", "awesome", "amazing", "perfect", "wonderful",
+        "fantastic", "love", "loved", "good", "nice", "best", "outstanding",
+    }
+    words = [w.strip(".,!?;:\"'()[]{}").lower() for w in str(comment).split()]
+    words = [w for w in words if w]
+
+    if len(words) > max_words or not words:
+        return False
+
+    positive_hits = sum(1 for w in words if w in positive_markers)
+    return positive_hits >= 2 or (positive_hits / len(words)) >= 0.5
+
+
+def cluster_segment(texts: pd.Series, n_clusters: int) -> list[dict]:
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        lowercase=True,
+        ngram_range=(1, 3),
+        min_df=1,
+        max_df=0.95,
+        max_features=8000,
+    )
+    X = vectorizer.fit_transform(texts)
+    model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    labels = model.fit_predict(X)
+
+    terms = vectorizer.get_feature_names_out()
+    topics: list[dict] = []
+    for cluster_id in range(n_clusters):
+        center = model.cluster_centers_[cluster_id]
+        term_idx = center.argsort()[-10:][::-1]
+        top_terms = [terms[i] for i in term_idx]
+        topic_name = choose_topic_name(top_terms)
+        size = int((labels == cluster_id).sum())
+        sample = texts[labels == cluster_id].iloc[0] if size else ""
+
+        topics.append(
+            {
+                "topic_name": topic_name,
+                "cluster_id": int(cluster_id),
+                "size": size,
+                "top_terms": top_terms,
+                "sample_comment": str(sample)[:180],
+            }
         )
-
-        try:
-            X = vec.fit_transform(cleaned_rows)
-        except ValueError:
-            continue
-
-        if X.shape[1] == 0:
-            continue
-
-        scores = X.sum(axis=0).A1
-        phrases = vec.get_feature_names_out()
-        idx = scores.argsort()[-top_k:][::-1]
-        return [phrases[i] for i in idx]
-
-    return []
+    return topics
 
 
 def main() -> None:
@@ -67,56 +92,41 @@ def main() -> None:
 
     df = pd.read_csv(DATA_FILE)
     text_col = find_text_column(df)
-    texts = df[text_col].fillna("").astype(str)
-    texts = texts[texts.str.strip() != ""]
+    rating_col = find_rating_column(df)
 
-    if len(texts) < 10:
-        raise ValueError("Need at least 10 non-empty text rows for topic extraction.")
+    base = df[[text_col, rating_col]].copy()
+    base[text_col] = base[text_col].fillna("").astype(str)
+    base = base[base[text_col].str.strip() != ""]
+    base[rating_col] = pd.to_numeric(base[rating_col], errors="coerce")
+    base = base.dropna(subset=[rating_col])
 
-    vectorizer = TfidfVectorizer(
-        stop_words="english",
-        lowercase=True,
-        ngram_range=(1, 2),
-        min_df=2,
-        max_df=0.9,
-        max_features=8000,
-    )
-    X = vectorizer.fit_transform(texts)
+    high = base[base[rating_col] >= 4.0].copy()
+    low = base[base[rating_col] < 4.0].copy()
 
-    n_topics = min(8, max(3, len(texts) // 40))
-    model = NMF(n_components=n_topics, random_state=42, init="nndsvda", max_iter=500)
-    W = model.fit_transform(X)
-    H = model.components_
+    if len(high) < 5 or len(low) < 5:
+        raise ValueError("Need at least 5 comments in each rating segment.")
 
-    terms = vectorizer.get_feature_names_out()
-    topic_assignments = W.argmax(axis=1)
+    high_filtered = high[~high[text_col].apply(is_extremely_positive_short_comment)].copy()
+    if len(high_filtered) < 5:
+        high_filtered = high
 
     report = {
-        "rows_used": int(len(texts)),
+        "rows_used": int(len(base)),
         "text_column": text_col,
-        "model": "NMF(topic modeling) + TF-IDF keyphrase extraction",
-        "topics": [],
-        "global_top_phrases": top_phrases_from_rows(texts, top_k=15),
+        "rating_column": rating_col,
+        "model": "KMeans + TF-IDF keyphrase extraction",
+        "segments": {
+            "rating_gte_4": {
+                "comments_before_filter": int(len(high)),
+                "comments_after_filter": int(len(high_filtered)),
+                "clusters": cluster_segment(high_filtered[text_col], n_clusters=5),
+            },
+            "rating_lt_4": {
+                "comments": int(len(low)),
+                "clusters": cluster_segment(low[text_col], n_clusters=5),
+            },
+        },
     }
-
-    for topic_id in range(n_topics):
-        term_idx = H[topic_id].argsort()[-10:][::-1]
-        top_terms = [terms[i] for i in term_idx]
-
-        member_mask = topic_assignments == topic_id
-        member_rows = texts[member_mask]
-        size = int(member_mask.sum())
-
-        phrases = top_phrases_from_rows(member_rows, top_k=8) if size >= 5 else []
-
-        report["topics"].append(
-            {
-                "topic": int(topic_id),
-                "size": size,
-                "top_terms": top_terms,
-                "top_phrases": phrases,
-            }
-        )
 
     print(json.dumps(report, indent=2))
 
