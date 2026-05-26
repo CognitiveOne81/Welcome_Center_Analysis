@@ -1,86 +1,31 @@
-# GitHub Code Display + Email Sender
+# Housing Feedback Analysis
 
-This repository includes utility scripts for feedback analysis and notifications.
+## Instant comment-theme analysis on every PR
 
-## Automated GitHub feature (pre-merge run + email on merge)
+This repo is configured with GitHub Actions to run topic/phrase extraction automatically on each pull request.
 
-A GitHub Actions workflow is included at:
+### Recommended model for your goal (common phrases + ideas)
 
-- `.github/workflows/model-preview-and-email.yml`
+Use **NMF topic modeling on TF-IDF vectors with n-grams**, then extract top bi/tri-grams per topic.
 
-It does two things:
+Why this is a good fit:
+- Works well on short feedback comments.
+- Produces interpretable topic keywords.
+- Captures repeated phrases via n-grams.
+- Runs fast and reliably in CI.
 
-1. **Before merge (Pull Request to `main`)**
-   - Installs dependencies.
-   - Runs the clustering model in GitHub Actions.
-   - Uploads the output as an artifact (`model-output-preview`) so you can review results before clicking merge.
+### What happens when you open/update a PR
 
-2. **After merge (Push to `main`)**
-   - Re-runs the clustering model on the merged code.
-   - Emails the run output (`model_output.txt`) using SMTP credentials stored as GitHub repository secrets.
+1. GitHub Action installs Python dependencies.
+2. It runs `scripts/run_clustering.py` on `7-1-2024 -5-19-2026 Housing Feedback.csv`.
+3. It uploads `clustering_report.json` as a workflow artifact.
+4. It posts the JSON report as a comment directly on the pull request.
 
-### Required GitHub secrets
+### How to use it
 
-Set these in **Settings → Secrets and variables → Actions**:
+1. Push your branch to GitHub.
+2. Open a pull request.
+3. Go to the **Actions** tab and open the latest **Run clustering on pull requests** run.
+4. Read the PR comment or download the artifact.
 
-- `RECIPIENT_EMAIL`
-- `SENDER_EMAIL`
-- `SMTP_SERVER`
-- `SMTP_PORT`
-- `SMTP_USERNAME`
-- `SMTP_PASSWORD`
-
-## Scripts
-
-### 1) Display GitHub code and send email
-
-The script in `scripts/github_email_sender.py` contains one function:
-
-- `display_github_code_and_send_email(...)`
-
-That function:
-1. Reads a local code file.
-2. Prints the code to stdout (for GitHub Actions logs / terminal display).
-3. Emails the same code to your recipient address via SMTP.
-
-Usage:
-
-```bash
-python scripts/github_email_sender.py \
-  --file README.md \
-  --to you@example.com \
-  --from sender@example.com \
-  --smtp-server smtp.example.com \
-  --smtp-port 587 \
-  --smtp-username your_user \
-  --smtp-password your_password
-```
-
-Optional:
-- `--subject "Custom subject"`
-- `--use-tls` (recommended for port 587)
-
-### 2) Cluster housing feedback comments
-
-The script `scripts/housing_feedback_clustering.py` builds a text clustering model for the **Housing Feedback** dataset (`7-1-2024 -5-19-2026 Housing Feedback.csv`) using TF-IDF + KMeans.
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run clustering:
-
-```bash
-python scripts/housing_feedback_clustering.py --high-rating-clusters 3 --low-rating-clusters 3
-```
-
-Optional arguments:
-- `--dataset <path>`: custom CSV path.
-- `--comments-column <name>`: text column to cluster (default `Comments`).
-- `--rating-column <name>`: rating column used to split cohorts (default `Rating`).
-- `--high-rating-threshold <num>`: split threshold (default `4.0`).
-- `--high-rating-clusters <n>`: clusters for ratings `>= threshold` (default `3`).
-- `--low-rating-clusters <n>`: clusters for ratings `< threshold` (default `3`).
-- `--top-terms <n>`: number of representative terms per cluster.
+If your data format/column names change, update `scripts/run_clustering.py`.
