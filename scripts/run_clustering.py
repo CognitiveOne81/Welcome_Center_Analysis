@@ -1,134 +1,327 @@
 #!/usr/bin/env python3
-"""Extract rating-segmented feedback themes with phrase-first cluster headings."""
-import json
-from pathlib import Path
+"""Cluster housing feedback comments into themes using TF-IDF + KMeans."""
 
-import pandas as pd
+from __future__ import annotations
+
+import argparse
+import csv
+from collections import Counter
+from pathlib import Path
+from typing import Optional
+
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
-
-DATA_FILE = Path("7-1-2024 -5-19-2026 Housing Feedback.csv")
-TEXT_COLUMN_CANDIDATES = ["Comments", "Feedback", "comment", "text"]
-RATING_COLUMN_CANDIDATES = ["Rating", "rating", "Score", "score"]
+from sklearn.metrics import silhouette_score
 
 
-def find_text_column(df: pd.DataFrame) -> str:
-    for col in TEXT_COLUMN_CANDIDATES:
-        if col in df.columns:
-            return col
-    for col in df.columns:
-        if df[col].dtype == object:
-            return col
-    raise ValueError("Could not find a text column in dataset.")
+DEFAULT_DATASET = Path("7-1-2024 -5-19-2026 Housing Feedback.csv")
 
 
-def find_rating_column(df: pd.DataFrame) -> str:
-    for col in RATING_COLUMN_CANDIDATES:
-        if col in df.columns:
-            return col
-    raise ValueError(f"Could not find a rating column. Tried: {RATING_COLUMN_CANDIDATES}")
+def load_comments_by_rating(
+    csv_path: Path,
+    comments_column: str = "Comments",
+    rating_column: str = "Rating",
+    high_rating_threshold: float = 4.0,
+) -> tuple[list[str], list[str]]:
+    """Load non-empty comments, split into >= threshold and < threshold rating groups."""
+    high_rating_comments: list[str] = []
+    low_rating_comments: list[str] = []
+
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        fieldnames = reader.fieldnames or []
+
+        if comments_column not in fieldnames:
+            raise ValueError(
+                f"Column '{comments_column}' not found. Available columns: {fieldnames}"
+            )
+        if rating_column not in fieldnames:
+            raise ValueError(
+                f"Column '{rating_column}' not found. Available columns: {fieldnames}"
+            )
+
+        for row in reader:
+            comment = (row.get(comments_column) or "").strip()
+            rating_raw = (row.get(rating_column) or "").strip()
+
+            if not comment or not rating_raw:
+                continue
+
+            try:
+                rating_value = float(rating_raw)
+            except ValueError:
+                continue
+
+            if rating_value >= high_rating_threshold:
+                high_rating_comments.append(comment)
+            else:
+                low_rating_comments.append(comment)
+
+    return high_rating_comments, low_rating_comments
 
 
-def choose_topic_name(top_terms: list[str]) -> str:
-    for term in top_terms:
+def select_cluster_count(
+    matrix,
+    min_k: int = 2,
+    max_k: int = 10,
+    random_state: int = 42,
+) -> tuple[int, list[dict[str, float]]]:
+    """Select cluster count by silhouette score across candidate k values."""
+    n_samples = matrix.shape[0]
+    if n_samples < 3:
+        raise ValueError("Need at least 3 comments to evaluate cluster counts.")
+
+    max_candidate = min(max_k, n_samples - 1)
+    min_candidate = max(2, min_k)
+    if min_candidate > max_candidate:
+        raise ValueError("Not enough comments to evaluate requested k sweep range.")
+
+    best_k: Optional[int] = None
+    best_score = float("-inf")
+    diagnostics: list[dict[str, float]] = []
+
+    for k in range(min_candidate, max_candidate + 1):
+        model = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+        labels = model.fit_predict(matrix)
+        score = float(silhouette_score(matrix, labels))
+        diagnostics.append({"k": float(k), "silhouette": score})
+
+        if score > best_score:
+            best_score = score
+            best_k = k
+
+    if best_k is None:
+        raise ValueError("Unable to select a cluster count from candidate range.")
+
+    return best_k, diagnostics
+
+
+def cluster_comments(
+    comments: list[str],
+    num_clusters: Optional[int],
+    random_state: int = 42,
+    ngram_range: tuple[int, int] = (1, 3),
+    k_min: int = 2,
+    k_max: int = 10,
+) -> tuple[list[int], KMeans, TfidfVectorizer, int, list[dict[str, float]]]:
+    """Cluster comments and return labels/model/vectorizer plus k-selection diagnostics."""
+    vectorizer = TfidfVectorizer(stop_words="english", min_df=1, ngram_range=ngram_range)
+    matrix = vectorizer.fit_transform(comments)
+
+    diagnostics: list[dict[str, float]] = []
+    selected_k = num_clusters if num_clusters is not None else 0
+
+    if num_clusters is None:
+        selected_k, diagnostics = select_cluster_count(
+            matrix,
+            min_k=k_min,
+            max_k=k_max,
+            random_state=random_state,
+        )
+
+    model = KMeans(n_clusters=selected_k, random_state=random_state, n_init=10)
+    labels = model.fit_predict(matrix)
+    return labels.tolist(), model, vectorizer, selected_k, diagnostics
+
+
+def choose_cluster_heading(terms: list[str]) -> str:
+    """Prefer a multi-word phrase for the cluster heading when available."""
+    for term in terms:
         if " " in term:
             return term
-    return top_terms[0] if top_terms else "n/a"
+    return terms[0] if terms else "n/a"
+
+
+def choose_heading_from_centroid_neighbors(
+    comments: list[str],
+    labels: list[int],
+    cluster_id: int,
+    matrix,
+    centroid,
+    fallback_terms: list[str],
+) -> str:
+    """Label cluster from phrases in comments nearest to cluster centroid."""
+    cluster_indices = [i for i, label in enumerate(labels) if label == cluster_id]
+    if not cluster_indices:
+        return choose_cluster_heading(fallback_terms)
+
+    cluster_matrix = matrix[cluster_indices]
+    similarity = (cluster_matrix @ centroid.reshape(-1, 1)).ravel()
+    nearest_local = similarity.argsort()[::-1][:5]
+    nearest_comments = [comments[cluster_indices[i]] for i in nearest_local]
+
+    local_vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(2, 3), min_df=1)
+    try:
+        phrase_matrix = local_vectorizer.fit_transform(nearest_comments)
+    except ValueError:
+        return choose_cluster_heading(fallback_terms)
+
+    phrases = local_vectorizer.get_feature_names_out()
+    scores = phrase_matrix.sum(axis=0).A1
+    ranked = scores.argsort()[::-1]
+    for idx in ranked:
+        phrase = phrases[idx].strip()
+        if phrase and len(phrase.split()) >= 2:
+            return phrase
+
+    return choose_cluster_heading(fallback_terms)
+
+
+def print_cluster_summary(
+    segment_title: str,
+    comments: list[str],
+    labels: list[int],
+    vectorizer: TfidfVectorizer,
+    model: KMeans,
+    top_n_terms: int = 5,
+) -> None:
+    """Print cluster sizes, phrase-led headings, and sample comments."""
+    counts = Counter(labels)
+    terms = vectorizer.get_feature_names_out()
+    matrix = vectorizer.transform(comments)
+
+    print(f"\n{segment_title}")
+    print("=" * 60)
+
+    for cluster_id in sorted(counts):
+        center = model.cluster_centers_[cluster_id]
+        top_indices = center.argsort()[-top_n_terms:][::-1]
+        top_terms = [terms[i] for i in top_indices]
+
+        cluster_comments_list = [c for c, l in zip(comments, labels) if l == cluster_id]
+        sample = cluster_comments_list[0] if cluster_comments_list else ""
+
+        heading = choose_heading_from_centroid_neighbors(
+            comments,
+            labels,
+            cluster_id,
+            matrix,
+            center,
+            fallback_terms=top_terms,
+        )
+
+        print(f"Cluster {cluster_id}: {heading}")
+        print(f"- Size: {counts[cluster_id]}")
+        print(f"- Top phrases/terms: {', '.join(top_terms)}")
+        print(f"- Sample comment: {sample[:180]}")
+        print("-" * 60)
 
 
 def is_extremely_positive_short_comment(comment: str, max_words: int = 6) -> bool:
+    """Heuristic to remove very short, highly positive comments from high-rating set."""
     positive_markers = {
         "great", "excellent", "awesome", "amazing", "perfect", "wonderful",
         "fantastic", "love", "loved", "good", "nice", "best", "outstanding",
     }
-    words = [w.strip(".,!?;:\"'()[]{}").lower() for w in str(comment).split()]
+
+    words = [w.strip(".,!?;:\"'()[]{}").lower() for w in comment.split()]
     words = [w for w in words if w]
 
     if len(words) > max_words or not words:
         return False
 
     positive_hits = sum(1 for w in words if w in positive_markers)
-    return positive_hits >= 2 or (positive_hits / len(words)) >= 0.5
+    ratio = positive_hits / len(words)
+
+    return positive_hits >= 2 or ratio >= 0.5
 
 
-def cluster_segment(texts: pd.Series, n_clusters: int) -> list[dict]:
-    vectorizer = TfidfVectorizer(
-        stop_words="english",
-        lowercase=True,
-        ngram_range=(1, 3),
-        min_df=1,
-        max_df=0.95,
-        max_features=8000,
+def filter_high_rating_comments_for_depth(comments: list[str]) -> list[str]:
+    """Keep longer/more descriptive high-rating comments by removing short praise blurbs."""
+    filtered = [c for c in comments if not is_extremely_positive_short_comment(c)]
+    return filtered or comments
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Cluster housing feedback comments using KMeans."
     )
-    X = vectorizer.fit_transform(texts)
-    model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = model.fit_predict(X)
+    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
+    parser.add_argument("--comments-column", default="Comments")
+    parser.add_argument("--rating-column", default="Rating")
+    parser.add_argument("--high-rating-threshold", type=float, default=4.0)
+    parser.add_argument("--high-rating-clusters", type=int, default=None)
+    parser.add_argument("--low-rating-clusters", type=int, default=None)
+    parser.add_argument("--k-min", type=int, default=2)
+    parser.add_argument("--k-max", type=int, default=10)
+    parser.add_argument("--top-terms", type=int, default=5)
+    return parser.parse_args()
 
-    terms = vectorizer.get_feature_names_out()
-    topics: list[dict] = []
-    for cluster_id in range(n_clusters):
-        center = model.cluster_centers_[cluster_id]
-        term_idx = center.argsort()[-10:][::-1]
-        top_terms = [terms[i] for i in term_idx]
-        topic_name = choose_topic_name(top_terms)
-        size = int((labels == cluster_id).sum())
-        sample = texts[labels == cluster_id].iloc[0] if size else ""
 
-        topics.append(
-            {
-                "topic_name": topic_name,
-                "cluster_id": int(cluster_id),
-                "size": size,
-                "top_terms": top_terms,
-                "sample_comment": str(sample)[:180],
-            }
+def validate_cluster_count(cluster_count: int, comments_count: int, label: str) -> None:
+    if cluster_count < 2:
+        raise ValueError(f"{label} must be at least 2.")
+    if cluster_count >= comments_count:
+        raise ValueError(
+            f"{label} ({cluster_count}) must be less than number of comments in that segment ({comments_count})."
         )
-    return topics
 
 
 def main() -> None:
-    if not DATA_FILE.exists():
-        raise FileNotFoundError(f"Dataset not found: {DATA_FILE}")
+    args = parse_args()
 
-    df = pd.read_csv(DATA_FILE)
-    text_col = find_text_column(df)
-    rating_col = find_rating_column(df)
+    high_comments, low_comments = load_comments_by_rating(
+        args.dataset,
+        comments_column=args.comments_column,
+        rating_column=args.rating_column,
+        high_rating_threshold=args.high_rating_threshold,
+    )
 
-    base = df[[text_col, rating_col]].copy()
-    base[text_col] = base[text_col].fillna("").astype(str)
-    base = base[base[text_col].str.strip() != ""]
-    base[rating_col] = pd.to_numeric(base[rating_col], errors="coerce")
-    base = base.dropna(subset=[rating_col])
+    if not high_comments:
+        raise ValueError("No non-empty comments found for the high-rating segment.")
 
-    high = base[base[rating_col] >= 4.0].copy()
-    low = base[base[rating_col] < 4.0].copy()
+    filtered_high_comments = filter_high_rating_comments_for_depth(high_comments)
+    if not low_comments:
+        raise ValueError("No non-empty comments found for the low-rating segment.")
 
-    if len(high) < 5 or len(low) < 5:
-        raise ValueError("Need at least 5 comments in each rating segment.")
+    if args.high_rating_clusters is not None:
+        validate_cluster_count(args.high_rating_clusters, len(filtered_high_comments), "--high-rating-clusters")
+    if args.low_rating_clusters is not None:
+        validate_cluster_count(args.low_rating_clusters, len(low_comments), "--low-rating-clusters")
 
-    high_filtered = high[~high[text_col].apply(is_extremely_positive_short_comment)].copy()
-    if len(high_filtered) < 5:
-        high_filtered = high
+    removed_short_positive = len(high_comments) - len(filtered_high_comments)
+    print(
+        f"Loaded high-rating comments (>= {args.high_rating_threshold}): {len(high_comments)} "
+        f"(filtered out {removed_short_positive} very short/extremely positive comments)"
+    )
+    high_labels, high_model, high_vectorizer, high_k, high_diag = cluster_comments(
+        filtered_high_comments,
+        args.high_rating_clusters,
+        k_min=args.k_min,
+        k_max=args.k_max,
+    )
+    print(f"Selected high-rating k: {high_k}")
+    if high_diag:
+        print(f"k sweep (high): {high_diag}")
 
-    report = {
-        "rows_used": int(len(base)),
-        "text_column": text_col,
-        "rating_column": rating_col,
-        "model": "KMeans + TF-IDF keyphrase extraction",
-        "segments": {
-            "rating_gte_4": {
-                "comments_before_filter": int(len(high)),
-                "comments_after_filter": int(len(high_filtered)),
-                "clusters": cluster_segment(high_filtered[text_col], n_clusters=5),
-            },
-            "rating_lt_4": {
-                "comments": int(len(low)),
-                "clusters": cluster_segment(low[text_col], n_clusters=5),
-            },
-        },
-    }
+    print_cluster_summary(
+        f"Cluster Summary: Rating >= {args.high_rating_threshold}",
+        filtered_high_comments,
+        high_labels,
+        high_vectorizer,
+        high_model,
+        args.top_terms,
+    )
 
-    print(json.dumps(report, indent=2))
+    print(f"\nLoaded low-rating comments (< {args.high_rating_threshold}): {len(low_comments)}")
+    low_labels, low_model, low_vectorizer, low_k, low_diag = cluster_comments(
+        low_comments,
+        args.low_rating_clusters,
+        k_min=args.k_min,
+        k_max=args.k_max,
+    )
+    print(f"Selected low-rating k: {low_k}")
+    if low_diag:
+        print(f"k sweep (low): {low_diag}")
+
+    print_cluster_summary(
+        f"Cluster Summary: Rating < {args.high_rating_threshold}",
+        low_comments,
+        low_labels,
+        low_vectorizer,
+        low_model,
+        args.top_terms,
+    )
 
 
 if __name__ == "__main__":
