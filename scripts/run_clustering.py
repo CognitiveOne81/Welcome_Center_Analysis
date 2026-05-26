@@ -22,19 +22,43 @@ def find_text_column(df: pd.DataFrame) -> str:
 
 
 def top_phrases_from_rows(rows: pd.Series, top_k: int = 10) -> list[str]:
-    vec = TfidfVectorizer(
-        stop_words="english",
-        lowercase=True,
-        ngram_range=(2, 3),
-        min_df=2,
-        max_df=0.9,
-        max_features=3000,
-    )
-    X = vec.fit_transform(rows)
-    scores = X.sum(axis=0).A1
-    phrases = vec.get_feature_names_out()
-    idx = scores.argsort()[-top_k:][::-1]
-    return [phrases[i] for i in idx]
+    cleaned_rows = rows.fillna("").astype(str)
+    cleaned_rows = cleaned_rows[cleaned_rows.str.strip() != ""]
+
+    if len(cleaned_rows) < 2:
+        return []
+
+    # First pass: stricter settings for cleaner, repeated phrases.
+    # Fallback pass: relax document frequency thresholds so tiny/sparse clusters do not fail.
+    vectorizer_configs = [
+        {"min_df": 2, "max_df": 0.9},
+        {"min_df": 1, "max_df": 1.0},
+    ]
+
+    for config in vectorizer_configs:
+        vec = TfidfVectorizer(
+            stop_words="english",
+            lowercase=True,
+            ngram_range=(2, 3),
+            min_df=config["min_df"],
+            max_df=config["max_df"],
+            max_features=3000,
+        )
+
+        try:
+            X = vec.fit_transform(cleaned_rows)
+        except ValueError:
+            continue
+
+        if X.shape[1] == 0:
+            continue
+
+        scores = X.sum(axis=0).A1
+        phrases = vec.get_feature_names_out()
+        idx = scores.argsort()[-top_k:][::-1]
+        return [phrases[i] for i in idx]
+
+    return []
 
 
 def main() -> None:
