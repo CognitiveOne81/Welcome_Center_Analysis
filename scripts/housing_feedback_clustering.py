@@ -58,15 +58,28 @@ def load_comments_by_rating(
     return high_rating_comments, low_rating_comments
 
 
-def cluster_comments(comments: list[str], num_clusters: int, random_state: int = 42) -> tuple[list[int], KMeans, TfidfVectorizer]:
+def cluster_comments(
+    comments: list[str],
+    num_clusters: int,
+    random_state: int = 42,
+    ngram_range: tuple[int, int] = (1, 3),
+) -> tuple[list[int], KMeans, TfidfVectorizer]:
     """Cluster comments and return labels + fitted model/vectorizer."""
-    vectorizer = TfidfVectorizer(stop_words="english", min_df=1)
+    vectorizer = TfidfVectorizer(stop_words="english", min_df=1, ngram_range=ngram_range)
     matrix = vectorizer.fit_transform(comments)
 
     model = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=10)
     labels = model.fit_predict(matrix)
 
     return labels.tolist(), model, vectorizer
+
+
+def choose_cluster_heading(terms: list[str]) -> str:
+    """Prefer a multi-word phrase for the cluster heading when available."""
+    for term in terms:
+        if " " in term:
+            return term
+    return terms[0] if terms else "n/a"
 
 
 def print_cluster_summary(
@@ -77,7 +90,7 @@ def print_cluster_summary(
     model: KMeans,
     top_n_terms: int = 5,
 ) -> None:
-    """Print cluster sizes, top terms, and sample comments."""
+    """Print cluster sizes, phrase-led headings, and sample comments."""
     counts = Counter(labels)
     terms = vectorizer.get_feature_names_out()
 
@@ -92,11 +105,38 @@ def print_cluster_summary(
         cluster_comments_list = [c for c, l in zip(comments, labels) if l == cluster_id]
         sample = cluster_comments_list[0] if cluster_comments_list else ""
 
-        print(f"Cluster {cluster_id}")
+        heading = choose_cluster_heading(top_terms)
+
+        print(f"Cluster {cluster_id}: {heading}")
         print(f"- Size: {counts[cluster_id]}")
-        print(f"- Top terms: {', '.join(top_terms)}")
+        print(f"- Top phrases/terms: {', '.join(top_terms)}")
         print(f"- Sample comment: {sample[:180]}")
         print("-" * 60)
+
+
+def is_extremely_positive_short_comment(comment: str, max_words: int = 6) -> bool:
+    """Heuristic to remove very short, highly positive comments from high-rating set."""
+    positive_markers = {
+        "great", "excellent", "awesome", "amazing", "perfect", "wonderful",
+        "fantastic", "love", "loved", "good", "nice", "best", "outstanding",
+    }
+
+    words = [w.strip(".,!?;:\"'()[]{}").lower() for w in comment.split()]
+    words = [w for w in words if w]
+
+    if len(words) > max_words or not words:
+        return False
+
+    positive_hits = sum(1 for w in words if w in positive_markers)
+    ratio = positive_hits / len(words)
+
+    return positive_hits >= 2 or ratio >= 0.5
+
+
+def filter_high_rating_comments_for_depth(comments: list[str]) -> list[str]:
+    """Keep longer/more descriptive high-rating comments by removing short praise blurbs."""
+    filtered = [c for c in comments if not is_extremely_positive_short_comment(c)]
+    return filtered or comments
 
 
 def parse_args() -> argparse.Namespace:
@@ -128,14 +168,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--high-rating-clusters",
         type=int,
-        default=3,
-        help="Number of clusters for high rating segment (default: 3)",
+        default=5,
+        help="Number of clusters for high rating segment (default: 5)",
     )
     parser.add_argument(
         "--low-rating-clusters",
         type=int,
-        default=3,
-        help="Number of clusters for low rating segment (default: 3)",
+        default=5,
+        help="Number of clusters for low rating segment (default: 5)",
     )
     parser.add_argument(
         "--top-terms",
@@ -167,12 +207,14 @@ def main() -> None:
 
     if not high_comments:
         raise ValueError("No non-empty comments found for the high-rating segment.")
+
+    filtered_high_comments = filter_high_rating_comments_for_depth(high_comments)
     if not low_comments:
         raise ValueError("No non-empty comments found for the low-rating segment.")
 
     validate_cluster_count(
         args.high_rating_clusters,
-        len(high_comments),
+        len(filtered_high_comments),
         "--high-rating-clusters",
     )
     validate_cluster_count(
@@ -181,13 +223,17 @@ def main() -> None:
         "--low-rating-clusters",
     )
 
-    print(f"Loaded high-rating comments (>= {args.high_rating_threshold}): {len(high_comments)}")
+    removed_short_positive = len(high_comments) - len(filtered_high_comments)
+    print(
+        f"Loaded high-rating comments (>= {args.high_rating_threshold}): {len(high_comments)} "
+        f"(filtered out {removed_short_positive} very short/extremely positive comments)"
+    )
     high_labels, high_model, high_vectorizer = cluster_comments(
-        high_comments, args.high_rating_clusters
+        filtered_high_comments, args.high_rating_clusters
     )
     print_cluster_summary(
         f"Cluster Summary: Rating >= {args.high_rating_threshold}",
-        high_comments,
+        filtered_high_comments,
         high_labels,
         high_vectorizer,
         high_model,
