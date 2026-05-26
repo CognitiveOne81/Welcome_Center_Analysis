@@ -16,6 +16,10 @@ from sklearn.metrics import silhouette_score
 
 DEFAULT_DATASET = Path("7-1-2024 -5-19-2026 Housing Feedback.csv")
 
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
+
 
 def load_comments_by_rating(
     csv_path: Path,
@@ -139,36 +143,46 @@ def choose_heading_from_centroid_neighbors(
     matrix,
     centroid,
     fallback_terms: list[str],
+    min_phrase_doc_count: int = 2,
 ) -> str:
-    """Label cluster from phrases in comments nearest to cluster centroid."""
+    """Label cluster from phrases shared across comments nearest to cluster centroid."""
     cluster_indices = [i for i, label in enumerate(labels) if label == cluster_id]
     if not cluster_indices:
         return choose_cluster_heading(fallback_terms)
 
     cluster_matrix = matrix[cluster_indices]
     similarity = (cluster_matrix @ centroid.reshape(-1, 1)).ravel()
-    nearest_local = similarity.argsort()[::-1][:5]
+    nearest_local = similarity.argsort()[::-1][: min(10, len(cluster_indices))]
     nearest_comments = [comments[cluster_indices[i]] for i in nearest_local]
 
-    local_vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(2, 3), min_df=1)
+    local_vectorizer = TfidfVectorizer(
+        stop_words="english",
+        ngram_range=(2, 3),
+        min_df=1,
+        binary=True,
+    )
     try:
         phrase_matrix = local_vectorizer.fit_transform(nearest_comments)
     except ValueError:
         return choose_cluster_heading(fallback_terms)
 
     phrases = local_vectorizer.get_feature_names_out()
-    scores = phrase_matrix.sum(axis=0).A1
-    ranked = scores.argsort()[::-1]
-    for idx in ranked:
-        phrase = phrases[idx].strip()
-        if phrase and len(phrase.split()) >= 2:
-            return phrase
+    doc_counts = phrase_matrix.sum(axis=0).A1
+    valid_indices = [i for i, c in enumerate(doc_counts) if c >= min_phrase_doc_count]
+
+    if valid_indices:
+        ranked = sorted(valid_indices, key=lambda i: doc_counts[i], reverse=True)
+        for idx in ranked:
+            phrase = phrases[idx].strip()
+            if phrase and len(phrase.split()) >= 2:
+                return phrase
 
     return choose_cluster_heading(fallback_terms)
 
 
 def print_cluster_summary(
     segment_title: str,
+    segment_color: str,
     comments: list[str],
     labels: list[int],
     vectorizer: TfidfVectorizer,
@@ -180,8 +194,8 @@ def print_cluster_summary(
     terms = vectorizer.get_feature_names_out()
     matrix = vectorizer.transform(comments)
 
-    print(f"\n{segment_title}")
-    print("=" * 60)
+    print(f"\n{segment_color}{segment_title}{RESET}")
+    print(f"{segment_color}{"=" * 60}{RESET}")
 
     for cluster_id in sorted(counts):
         center = model.cluster_centers_[cluster_id]
@@ -296,6 +310,7 @@ def main() -> None:
 
     print_cluster_summary(
         f"Cluster Summary: Rating >= {args.high_rating_threshold}",
+        GREEN,
         filtered_high_comments,
         high_labels,
         high_vectorizer,
@@ -316,6 +331,7 @@ def main() -> None:
 
     print_cluster_summary(
         f"Cluster Summary: Rating < {args.high_rating_threshold}",
+        BLUE,
         low_comments,
         low_labels,
         low_vectorizer,
