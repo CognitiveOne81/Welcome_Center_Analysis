@@ -195,7 +195,7 @@ def print_cluster_summary(
     matrix = vectorizer.transform(comments)
 
     print(f"\n{segment_color}{segment_title}{RESET}")
-    print(f"{segment_color}{"=" * 60}{RESET}")
+    print(f"{segment_color}{'=' * 60}{RESET}")
 
     for cluster_id in sorted(counts):
         center = model.cluster_centers_[cluster_id]
